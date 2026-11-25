@@ -155,7 +155,7 @@ phishing-screenshot-ml-pipeline/
 ├── locust/                # locustfile.py, run_scaling_test.sh, results/
 ├── deploy/                # nginx.conf
 ├── docs/                  # demo script, UI screenshots
-├── Dockerfile, docker-compose.yml, render.yaml
+├── Dockerfile (full TensorFlow), Dockerfile.render (slim, Render), docker-compose.yml, render.yaml
 └── requirements.txt, requirements-dev.txt, requirements-render.txt
 ```
 
@@ -197,7 +197,7 @@ bash locust/run_scaling_test.sh 50 60s       # 50 users, 60 s, at 1, 2 and 4 con
 
 ## Deployment
 
-**Live deployment: Render (free tier) with the lightweight backend.**
+**Live deployment: Render (free tier), as a Docker container with the lightweight backend.**
 
 Full TensorFlow needs more than 1 GB of RAM, but Render's free tier has 512 MB. So the deployed service uses
 `src/lite.py`: the trained model is split into a **TFLite MobileNetV2 feature extractor**
@@ -211,9 +211,18 @@ images need to be embedded. The same promotion rule and version registry apply. 
 keeps the full TensorFlow backend, which fine-tunes the backbone too. `GET /health` reports which backend is running.
 
 Steps:
+Render builds `Dockerfile.render`, a slim image (about 260 MB) with `requirements-render.txt` and no TensorFlow.
+Tested locally with Render's free limits (`docker run --memory 512m --cpus 0.1`), it idles at about 90 MB and
+peaks at about 240 MB during a retrain, which takes about 3 minutes at 0.1 CPU.
+
+```bash
+docker build -f Dockerfile.render -t phish-iris-render .
+docker run -p 10000:10000 --memory 512m --cpus 0.1 phish-iris-render   # http://localhost:10000
+```
+
 1. Sign in at <https://dashboard.render.com> with GitHub.
 2. Click **New → Blueprint**, pick this repository and click **Apply**. Render reads `render.yaml`
-   (free web service, `pip install -r requirements-render.txt`, `uvicorn src.api:app`).
+   (free web service, Docker runtime, `Dockerfile.render`).
 3. When the deploy finishes, open `https://<service-name>.onrender.com` and put the URL in the table at the top.
 
 Free-tier limits: 0.1 CPU, the service sleeps after 15 minutes without traffic (the first request then takes
