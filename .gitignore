@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.cache/
+.ipynb_checkpoints/
+models/retrain.lock
+models/retrain_status.json
+models/*.tmp*
+data/uploads/*
+!data/uploads/.gitkeep
