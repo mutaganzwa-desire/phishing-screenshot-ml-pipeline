@@ -22,6 +22,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from src import lite
 from src import model as M
 from src import preprocessing as pp
 from src.prediction import get_predictor
@@ -108,7 +109,9 @@ def run_retrain(trigger: str):
 
     try:
         _log(f"Retraining started ({trigger}) on {HOSTNAME}")
-        entry = M.retrain(trigger=trigger, epochs=RETRAIN_EPOCHS, log=_log)
+        # Full fine-tuning with TensorFlow, or a head-only retrain on small hosts.
+        retrain_fn = lite.retrain if get_predictor().backend == "lite" else M.retrain
+        entry = retrain_fn(trigger=trigger, epochs=RETRAIN_EPOCHS, log=_log)
         get_predictor().reload_if_changed()
         write_status(state="finished", trigger=trigger, started_at=started, host=HOSTNAME,
                      finished_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -150,6 +153,7 @@ def health():
         "started_at": datetime.fromtimestamp(START_TIME, timezone.utc).isoformat(timespec="seconds"),
         "uptime_seconds": round(time.time() - START_TIME, 1),
         "model_version": p.version,
+        "backend": p.backend,
         "model_loaded": p.model is not None,
         "num_classes": len(p.class_names),
         "requests": stats["requests"],
