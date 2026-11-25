@@ -11,8 +11,8 @@ from the URL string to what the page **looks like**.
 
 | | |
 |---|---|
-| **Video demo** | _YouTube link: add before submitting_ |
-| **Live app** | _Deployed URL: add after deploying (see [Deployment](#deployment))_ |
+| **Video demo** | _YouTube link: |
+| **Live app** |  [_Deployed URL:](https://phish-iris-classifier.onrender.com/) |
 | **Dataset** | [Phish-IRIS](https://data.mendeley.com/datasets/tk4fkswtj5) (2,849 screenshots, 15 classes, collected 2018) |
 | **Model** | MobileNetV2 transfer learning (Keras), `models/phish_iris_mobilenetv2.h5` |
 | **Notebook** | [`notebook/phishing_screenshot_pipeline.ipynb`](notebook/phishing_screenshot_pipeline.ipynb) |
