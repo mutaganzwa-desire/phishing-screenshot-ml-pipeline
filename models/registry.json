@@ -1,0 +1,29 @@
+{
+  "current": 1,
+  "versions": [
+    {
+      "version": 1,
+      "file": "models/versions/phish_iris_mobilenetv2_v1.h5",
+      "created_at": "2026-11-23T10:16:44+00:00",
+      "trigger": "initial (notebook)",
+      "new_images": 0,
+      "n_train": 1387,
+      "accuracy": 0.7879901960784313,
+      "macro_f1": 0.648993855971497,
+      "binary_f1": 0.8377581120943953,
+      "promoted": true
+    },
+    {
+      "version": 2,
+      "file": "models/versions/phish_iris_mobilenetv2_v2.h5",
+      "created_at": "2026-11-23T10:17:53+00:00",
+      "trigger": "notebook demo",
+      "new_images": 30,
+      "n_train": 1412,
+      "accuracy": 0.7683823529411765,
+      "macro_f1": 0.5923113234699648,
+      "binary_f1": 0.8343023255813954,
+      "promoted": false
+    }
+  ]
+}
