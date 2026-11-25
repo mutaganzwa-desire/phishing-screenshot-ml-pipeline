@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Phish-IRIS Classifier</title>
+<script src="/static/chart.umd.min.js"></script>
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f4f4f2; --surface: #fcfcfb; --border: #e2e1dc;
+  --text: #0b0b0b; --text-2: #52514e; --muted: #7a7974;
+  --s1: #2a78d6; --s2: #eb6834; --accent: #2a78d6;
+  --good: #0f7b3e; --warn: #b26b00; --bad: #c62f2f;
+  --grid: #ecebe7;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #111110; --surface: #1a1a19; --border: #2e2e2c;
+    --text: #f0efec; --text-2: #c3c2b7; --muted: #8f8e88;
+    --s1: #3987e5; --s2: #d95926; --accent: #5598e7;
+    --good: #3fbf6f; --warn: #e0a030; --bad: #e66767; --grid: #2a2a28;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #111110; --surface: #1a1a19; --border: #2e2e2c;
+  --text: #f0efec; --text-2: #c3c2b7; --muted: #8f8e88;
+  --s1: #3987e5; --s2: #d95926; --accent: #5598e7;
+  --good: #3fbf6f; --warn: #e0a030; --bad: #e66767; --grid: #2a2a28;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+header { padding: 20px 16px 8px; max-width: 1200px; margin: 0 auto; }
+header h1 { margin: 0; font-size: 22px; }
+header p { margin: 4px 0 0; color: var(--text-2); }
+nav { display: flex; gap: 4px; flex-wrap: wrap; max-width: 1200px; margin: 12px auto 0; padding: 0 16px; }
+nav button { border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
+  padding: 8px 14px; border-radius: 8px; cursor: pointer; font: inherit; }
+nav button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+main { max-width: 1200px; margin: 0 auto; padding: 16px; }
+section { display: none; } section.active { display: block; }
+.grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; min-width: 0; }
+.card h2 { font-size: 16px; margin: 0 0 4px; } .card h3 { font-size: 14px; margin: 0 0 8px; color: var(--text-2); font-weight: 500; }
+.stat { font-size: 28px; font-weight: 650; font-variant-numeric: tabular-nums; }
+.stat-label { color: var(--muted); font-size: 13px; }
+.wide { grid-column: 1 / -1; }
+.story { color: var(--text-2); font-size: 14px; margin: 8px 0 0; }
+.chart-box { position: relative; height: 300px; }
+.chart-box.tall { height: 420px; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.ok { background: var(--good); } .down { background: var(--bad); } .busy { background: var(--warn); }
+.drop { display: block; margin-top: 8px; border: 2px dashed var(--border); border-radius: 12px; padding: 28px 16px; text-align: center; color: var(--text-2); cursor: pointer; }
+.drop.hover { border-color: var(--accent); }
+.btn { background: var(--accent); color: #fff; border: 0; padding: 10px 18px; border-radius: 8px; font: inherit; cursor: pointer; }
+.btn:disabled { opacity: .5; cursor: default; }
+select, input[type=file] { font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px; max-width: 100%; }
+img.preview { max-width: 100%; max-height: 320px; border-radius: 8px; border: 1px solid var(--border); display: block; margin: 12px auto 0; }
+.bar-row { display: grid; grid-template-columns: 110px 1fr 56px; gap: 8px; align-items: center; margin: 6px 0; font-size: 14px; }
+.bar-track { background: var(--grid); border-radius: 4px; height: 10px; overflow: hidden; }
+.bar-fill { background: var(--s1); height: 100%; border-radius: 4px; }
+.verdict { font-size: 18px; font-weight: 600; margin-top: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+th, td { padding: 6px 8px; border-bottom: 1px solid var(--border); text-align: left; }
+.scroll { overflow-x: auto; }
+.cm td { text-align: center; padding: 4px; min-width: 30px; border: 2px solid var(--surface); border-radius: 4px; }
+.cm th { font-weight: 500; color: var(--text-2); white-space: nowrap; }
+.swatch { display: inline-block; width: 28px; height: 18px; border-radius: 4px; border: 1px solid var(--border); vertical-align: middle; }
+pre.log { background: var(--bg); padding: 10px; border-radius: 8px; font-size: 12px; white-space: pre-wrap; max-height: 220px; overflow: auto; }
+.muted { color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Phish-IRIS screenshot classifier</h1>
+  <p>Tells which brand a phishing web page imitates, from a screenshot of the page.</p>
+</header>
+<nav>
+  <button data-tab="overview" class="active">Overview</button>
+  <button data-tab="predict">Predict</button>
+  <button data-tab="insights">Data insights</button>
+  <button data-tab="model">Model performance</button>
+  <button data-tab="retrain">Upload &amp; retrain</button>
+</nav>
+<main>
+  <!-- Overview / uptime -->
+  <section id="overview" class="active">
+    <div class="grid">
+      <div class="card"><div class="stat-label">Status</div><div class="stat" id="h-status">…</div><div class="muted" id="h-host"></div></div>
+      <div class="card"><div class="stat-label">Uptime</div><div class="stat" id="h-uptime">…</div><div class="muted" id="h-started"></div></div>
+      <div class="card"><div class="stat-label">Model version</div><div class="stat" id="h-version">…</div><div class="muted" id="h-classes"></div></div>
+      <div class="card"><div class="stat-label">Predictions served</div><div class="stat" id="h-preds">…</div><div class="muted" id="h-lat"></div></div>
+      <div class="card wide">
+        <h2>Prediction latency</h2>
+        <h3>p50 and p95 of recent /predict requests on the container that answered, sampled every 5 seconds (ms)</h3>
+        <div class="chart-box"><canvas id="c-uptime"></canvas></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Predict -->
+  <section id="predict">
+    <div class="grid">
+      <div class="card">
+        <h2>Classify one screenshot</h2>
+        <h3>Upload a PNG or JPG screenshot of a web page</h3>
+        <label class="drop" id="p-drop">Drop an image here, or click to choose
+          <input type="file" id="p-file" accept="image/*" hidden></label>
+        <img id="p-preview" class="preview" hidden alt="Screenshot preview">
+      </div>
+      <div class="card">
+        <h2>Prediction</h2>
+        <div id="p-result" class="muted">No image yet.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Insights -->
+  <section id="insights">
+    <div class="grid">
+      <div class="card wide">
+        <h2>1. Class balance: which brands get phished most?</h2>
+        <h3>Screenshots per class in the training and test sets</h3>
+        <div class="chart-box tall"><canvas id="c-counts"></canvas></div>
+        <p class="story" id="s-counts"></p>
+      </div>
+      <div class="card wide">
+        <h2>2. Colour: phishing kits copy the brand palette</h2>
+        <h3>Average colour and saturation of each class's screenshots</h3>
+        <div class="scroll"><table id="t-colour"></table></div>
+        <p class="story" id="s-colour"></p>
+      </div>
+      <div class="card wide">
+        <h2>3. Layout: how cluttered and how white each page is</h2>
+        <h3>Edge density (share of pixels on an edge) and whitespace ratio (share of near-white pixels), by class</h3>
+        <div class="chart-box tall"><canvas id="c-layout"></canvas></div>
+        <p class="story" id="s-layout"></p>
+      </div>
+      <div class="card wide">
+        <h2>Example screenshots</h2>
+        <div id="samples" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Model -->
+  <section id="model">
+    <div class="grid" id="m-tiles"></div>
+    <div class="grid" style="margin-top:16px;grid-template-columns:repeat(auto-fit,minmax(min(440px,100%),1fr))">
+      <div class="card"><h2>Training history</h2><h3>Accuracy per epoch (head training, then fine-tuning)</h3>
+        <div class="chart-box"><canvas id="c-hist"></canvas></div></div>
+      <div class="card"><h2>F1-score by class</h2><h3>Test set</h3>
+        <div class="chart-box"><canvas id="c-f1"></canvas></div></div>
+      <div class="card wide"><h2>Confusion matrix</h2><h3>Rows are the true class, columns the predicted class. Darker means more screenshots.</h3>
+        <div class="scroll"><table class="cm" id="t-cm"></table></div></div>
+      <div class="card wide"><h2>Model versions</h2><div class="scroll"><table id="t-reg"></table></div></div>
+    </div>
+  </section>
+
+  <!-- Upload & retrain -->
+  <section id="retrain">
+    <div class="grid">
+      <div class="card">
+        <h2>1. Upload new training data</h2>
+        <h3>Many images with one label, or a .zip with one folder per class (paypal/, other/, …)</h3>
+        <p><select id="u-label"><option value="">Label taken from zip folders</option></select></p>
+        <p><input type="file" id="u-files" multiple accept="image/*,.zip"></p>
+        <button class="btn" id="u-btn">Upload</button>
+        <div id="u-result" class="muted" style="margin-top:10px"></div>
+      </div>
+      <div class="card">
+        <h2>2. Retrain the model</h2>
+        <h3>Fine-tunes the current model on all data plus the uploads. The new version is promoted only if its test macro-F1 does not drop.</h3>
+        <p id="r-pending" class="muted"></p>
+        <button class="btn" id="r-btn">Retrain now</button>
+        <p id="r-state" style="margin-top:10px"></p>
+        <pre class="log" id="r-log" hidden></pre>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const api = (p, o) => fetch(p, o).then(async r => { const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.detail || r.statusText); return j; });
+const fmtPct = (x) => x == null ? "–" : (x * 100).toFixed(1) + "%";
+const charts = {};
+let classes = [], labelNames = {};
+
+function chartDefaults() {
+  Chart.defaults.color = css("--text-2");
+  Chart.defaults.borderColor = css("--grid");
+  Chart.defaults.font.family = "system-ui, sans-serif";
+}
+function makeChart(id, cfg) { charts[id]?.destroy(); charts[id] = new Chart(document.getElementById(id), cfg); }
+
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button, section").forEach(e => e.classList.remove("active"));
+  b.classList.add("active"); $("#" + b.dataset.tab).classList.add("active");
+  ({ insights: loadInsights, model: loadModel, retrain: loadRetrain })[b.dataset.tab]?.();
+});
+
+// ---------------- Overview / uptime ----------------
+const uptimeSeries = { t: [], p50: [], p95: [] };
+function fmtUptime(s) { const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60);
+  return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m ${Math.floor(s % 60)}s`; }
+async function pollHealth() {
+  try {
+    const h = await api("/health");
+    $("#h-status").innerHTML = `<span class="dot ${h.retrain.state === "running" ? "busy" : "ok"}"></span>${h.retrain.state === "running" ? "Retraining" : "Online"}`;
+    $("#h-host").textContent = "Container " + h.host;
+    $("#h-uptime").textContent = fmtUptime(h.uptime_seconds);
+    $("#h-started").textContent = "Since " + new Date(h.started_at).toLocaleString();
+    $("#h-version").textContent = "v" + h.model_version;
+    $("#h-classes").textContent = h.num_classes + " classes";
+    $("#h-preds").textContent = h.predictions.toLocaleString();
+    $("#h-lat").textContent = h.latency_ms.p50 == null ? "No predictions yet" : `p50 ${h.latency_ms.p50} ms · p95 ${h.latency_ms.p95} ms`;
+    uptimeSeries.t.push(new Date().toLocaleTimeString()); uptimeSeries.p50.push(h.latency_ms.p50); uptimeSeries.p95.push(h.latency_ms.p95);
+    for (const k in uptimeSeries) if (uptimeSeries[k].length > 60) uptimeSeries[k].shift();
+    if (!charts["c-uptime"]) makeChart("c-uptime", { type: "line", data: { labels: uptimeSeries.t, datasets: [
+        { label: "p50", data: uptimeSeries.p50, borderColor: css("--s1"), backgroundColor: css("--s1"), borderWidth: 2, pointRadius: 2, spanGaps: true },
+        { label: "p95", data: uptimeSeries.p95, borderColor: css("--s2"), backgroundColor: css("--s2"), borderWidth: 2, pointRadius: 2, spanGaps: true }] },
+      options: { maintainAspectRatio: false, animation: false, interaction: { mode: "index", intersect: false },
+        scales: { y: { beginAtZero: true, title: { display: true, text: "ms" } }, x: { ticks: { maxTicksLimit: 8 } } } } });
+    else charts["c-uptime"].update();
+  } catch (e) {
+    $("#h-status").innerHTML = `<span class="dot down"></span>Offline`;
+  }
+}
+
+// ---------------- Predict ----------------
+const drop = $("#p-drop"), pfile = $("#p-file");
+drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("hover"); };
+drop.ondragleave = () => drop.classList.remove("hover");
+drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("hover"); if (e.dataTransfer.files[0]) predict(e.dataTransfer.files[0]); };
+pfile.onchange = () => pfile.files[0] && predict(pfile.files[0]);
+async function predict(file) {
+  const prev = $("#p-preview"); prev.src = URL.createObjectURL(file); prev.hidden = false;
+  $("#p-result").textContent = "Classifying…";
+  const fd = new FormData(); fd.append("file", file);
+  try {
+    const t0 = performance.now();
+    const r = await api("/predict", { method: "POST", body: fd });
+    const ms = Math.round(performance.now() - t0);
+    const color = r.label === "other" ? "--good" : "--bad";
+    $("#p-result").innerHTML = `<div class="verdict" style="color:var(${color})">${r.label === "other" ? "✓" : "⚠"} ${r.verdict}</div>
+      <p class="muted">Top class <b>${r.brand}</b> with ${fmtPct(r.confidence)} confidence. Phishing score (1 − P(other)): <b>${fmtPct(r.phishing_score)}</b>.</p>
+      ${r.top_k.map(k => `<div class="bar-row"><span>${k.brand}</span><div class="bar-track"><div class="bar-fill" style="width:${k.probability * 100}%"></div></div><span>${fmtPct(k.probability)}</span></div>`).join("")}
+      <p class="muted">Model v${r.model_version} · ${ms} ms round trip</p>`;
+  } catch (e) { $("#p-result").textContent = "Error: " + e.message; }
+}
+
+// ---------------- Insights ----------------
+let insightsLoaded = false;
+async function loadInsights() {
+  if (insightsLoaded) return; insightsLoaded = true;
+  const s = await api("/insights"); labelNames = s.label_names;
+  const names = Object.keys(s.classes).sort((a, b) => s.classes[b].train + s.classes[b].test - s.classes[a].train - s.classes[a].test);
+  const brand = (c) => labelNames[c] || c;
+  makeChart("c-counts", { type: "bar", data: { labels: names.map(brand), datasets: [
+      { label: "Train", data: names.map(c => s.classes[c].train), backgroundColor: css("--s1"), borderRadius: 4, borderSkipped: "start" },
+      { label: "Test", data: names.map(c => s.classes[c].test), backgroundColor: css("--s2"), borderRadius: 4, borderSkipped: "start" }] },
+    options: { indexAxis: "y", maintainAspectRatio: false, scales: { x: { title: { display: true, text: "screenshots" } }, y: { grid: { display: false } } } } });
+  const tot = (c) => s.classes[c].train + s.classes[c].test, all = names.reduce((a, c) => a + tot(c), 0);
+  const brands = names.filter(c => c !== "other");
+  $("#s-counts").textContent = `The "other" class (pages that copy none of the 14 brands) holds ${fmtPct(tot("other") / all)} of all ${all.toLocaleString()} screenshots, and the test set is even more skewed towards it. Among the brands, ${brands.slice(0, 3).map(brand).join(", ")} are the most phished, while ${brand(brands.at(-1))} has only ${tot(brands.at(-1))} examples. That imbalance is why training uses class weights and why we report macro-F1 and balanced accuracy, not just accuracy.`;
+
+  const byBlue = [...names].sort((a, b) => (s.classes[b].mean_b - s.classes[b].mean_r) - (s.classes[a].mean_b - s.classes[a].mean_r));
+  const rgb = (c) => `rgb(${s.classes[c].mean_r | 0},${s.classes[c].mean_g | 0},${s.classes[c].mean_b | 0})`;
+  $("#t-colour").innerHTML = `<tr><th>Class</th><th>Average colour</th><th>Red</th><th>Green</th><th>Blue</th><th>Blue − red</th><th>Saturation</th></tr>` +
+    byBlue.map(c => { const k = s.classes[c]; return `<tr><td>${brand(c)}</td><td><span class="swatch" style="background:${rgb(c)}"></span></td><td>${k.mean_r.toFixed(0)}</td><td>${k.mean_g.toFixed(0)}</td><td>${k.mean_b.toFixed(0)}</td><td>${(k.mean_b - k.mean_r).toFixed(1)}</td><td>${k.saturation.toFixed(0)}</td></tr>`; }).join("");
+  const sat = [...names].sort((a, b) => s.classes[b].saturation - s.classes[a].saturation);
+  $("#s-colour").textContent = `Phishing kits copy the brand's look, so colour alone carries signal. ${byBlue.slice(0, 3).map(brand).join(", ")} pages lean most towards blue, and ${byBlue.slice(-2).map(brand).join(" and ")} lean most towards red or yellow. ${sat.slice(0, 2).map(brand).join(" and ")} are the most saturated, while ${sat.slice(-2).map(brand).join(" and ")} are close to grey or white. Colour helps tell some brands apart, but brands that share a palette (the blue banks and social sites) need the logo and layout to separate them, which is what the CNN learns.`;
+
+  const byEdge = [...names].sort((a, b) => s.classes[b].edge_density - s.classes[a].edge_density);
+  makeChart("c-layout", { type: "bar", data: { labels: byEdge.map(brand), datasets: [
+      { label: "Edge density", data: byEdge.map(c => s.classes[c].edge_density), backgroundColor: css("--s1"), borderRadius: 4, borderSkipped: "start" },
+      { label: "Whitespace ratio", data: byEdge.map(c => s.classes[c].whitespace_ratio), backgroundColor: css("--s2"), borderRadius: 4, borderSkipped: "start" }] },
+    options: { indexAxis: "y", maintainAspectRatio: false, plugins: { tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${fmtPct(ctx.raw)}` } } },
+      scales: { x: { ticks: { callback: (v) => (v * 100) + "%" } }, y: { grid: { display: false } } } } });
+  const ws = [...names].sort((a, b) => s.classes[b].whitespace_ratio - s.classes[a].whitespace_ratio);
+  $("#s-layout").textContent = `The "other" pages are real websites full of text, images and menus, so their edge density is ${fmtPct(s.classes.other.edge_density)} against a brand average of ${fmtPct(brands.reduce((a, c) => a + s.classes[c].edge_density, 0) / brands.length)}. Phishing pages are mostly bare login forms: ${ws.slice(0, 3).map(brand).join(", ")} pages are the whitest (${brand(ws[0])} reaches ${fmtPct(s.classes[ws[0]].whitespace_ratio)} near-white pixels). In short, "a sparse white page with a famous logo and a password box" is the visual pattern of a phishing kit.`;
+
+  $("#samples").innerHTML = names.map(c => `<figure style="margin:0"><img src="/sample/${c}" alt="${brand(c)} example" loading="lazy" style="width:100%;border-radius:6px;border:1px solid var(--border)"><figcaption class="muted">${brand(c)}</figcaption></figure>`).join("");
+}
+
+// ---------------- Model ----------------
+async function loadModel() {
+  const { current, registry } = await api("/metrics"); const m = current.metrics, b = m.binary_phishing_vs_legit;
+  const tiles = [["Accuracy", m.accuracy], ["Macro F1", m.macro_f1], ["Balanced accuracy", m.balanced_accuracy], ["Top-3 accuracy", m.top3_accuracy],
+    ["Phishing vs legit F1", b.f1], ["Phishing vs legit ROC-AUC", b.roc_auc, true]];
+  $("#m-tiles").innerHTML = tiles.map(([l, v, raw]) => `<div class="card"><div class="stat-label">${l}</div><div class="stat">${raw ? v.toFixed(3) : fmtPct(v)}</div></div>`).join("") +
+    `<div class="card"><div class="stat-label">Test images</div><div class="stat">${m.n_test.toLocaleString()}</div><div class="muted">Model v${current.version}</div></div>`;
+  const h = current.history, ep = h.accuracy.map((_, i) => i + 1);
+  makeChart("c-hist", { type: "line", data: { labels: ep, datasets: [
+      { label: "Train", data: h.accuracy, borderColor: css("--s1"), backgroundColor: css("--s1"), borderWidth: 2, pointRadius: 3 },
+      { label: "Validation", data: h.val_accuracy, borderColor: css("--s2"), backgroundColor: css("--s2"), borderWidth: 2, pointRadius: 3 }] },
+    options: { maintainAspectRatio: false, interaction: { mode: "index", intersect: false },
+      scales: { y: { min: 0, max: 1, ticks: { callback: (v) => v * 100 + "%" } }, x: { title: { display: true, text: "epoch" } } } } });
+  const names = m.class_names, f1 = names.map(c => m.per_class[c]["f1-score"]);
+  makeChart("c-f1", { type: "bar", data: { labels: names.map(c => labelNames[c] || c), datasets: [{ label: "F1", data: f1, backgroundColor: css("--s1"), borderRadius: 4, borderSkipped: "start" }] },
+    options: { indexAxis: "y", maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { min: 0, max: 1 }, y: { grid: { display: false } } } } });
+  const cm = m.confusion_matrix, ramp = ["#cde2fb", "#9ec5f4", "#6da7ec", "#3987e5", "#256abf", "#184f95", "#0d366b"];
+  const short = names.map(c => (labelNames[c] || c).replace("Other / legitimate", "Other").replace("Bank of America", "BoA"));
+  $("#t-cm").innerHTML = `<tr><th></th>${short.map(n => `<th style="writing-mode:vertical-rl;transform:rotate(180deg)">${n}</th>`).join("")}</tr>` +
+    cm.map((row, i) => { const tot = row.reduce((a, b) => a + b, 0) || 1; return `<tr><th>${short[i]}</th>${row.map((v, j) => {
+      const share = v / tot, step = v ? Math.min(ramp.length - 1, Math.floor(share * ramp.length)) : -1;
+      return `<td title="True ${short[i]}, predicted ${short[j]}: ${v} (${fmtPct(share)} of row)" style="background:${step < 0 ? "transparent" : ramp[step]};color:${step >= 3 ? "#fff" : "var(--text)"}">${v || ""}</td>`; }).join("")}</tr>`; }).join("");
+  $("#t-reg").innerHTML = `<tr><th>Version</th><th>Created</th><th>Trigger</th><th>New images</th><th>Train size</th><th>Accuracy</th><th>Macro F1</th><th>Promoted</th></tr>` +
+    [...registry.versions].reverse().map(v => `<tr><td>v${v.version}${v.version === registry.current ? " (current)" : ""}</td><td>${new Date(v.created_at).toLocaleString()}</td><td>${v.trigger}</td><td>${v.new_images}</td><td>${v.n_train}</td><td>${fmtPct(v.accuracy)}</td><td>${fmtPct(v.macro_f1)}</td><td>${v.promoted ? "Yes" : "No"}</td></tr>`).join("");
+}
+
+// ---------------- Upload & retrain ----------------
+async function loadRetrain() {
+  if (!classes.length) {
+    classes = await api("/classes");
+    $("#u-label").innerHTML += classes.map(c => `<option value="${c.label}">${c.brand}</option>`).join("");
+  }
+  pollRetrain();
+}
+$("#u-btn").onclick = async () => {
+  const files = $("#u-files").files; if (!files.length) return ($("#u-result").textContent = "Choose files first.");
+  const fd = new FormData(); for (const f of files) fd.append("files", f);
+  if ($("#u-label").value) fd.append("label", $("#u-label").value);
+  $("#u-btn").disabled = true; $("#u-result").textContent = "Uploading…";
+  try {
+    const r = await api("/upload", { method: "POST", body: fd });
+    const n = Object.values(r.saved).reduce((a, b) => a + b, 0);
+    $("#u-result").textContent = `Saved ${n} image(s)${r.skipped.length ? `, skipped ${r.skipped.length}` : ""}. ${r.pending_total} waiting for retraining.` +
+      (r.auto_retrain_started ? " That reached the threshold, so retraining started automatically." : "");
+    pollRetrain();
+  } catch (e) { $("#u-result").textContent = "Error: " + e.message; }
+  $("#u-btn").disabled = false;
+};
+$("#r-btn").onclick = async () => {
+  try { await api("/retrain", { method: "POST" }); } catch (e) { $("#r-state").textContent = e.message; }
+  pollRetrain();
+};
+let retrainTimer;
+async function pollRetrain() {
+  clearTimeout(retrainTimer);
+  const [st, h] = await Promise.all([api("/retrain/status"), api("/health")]);
+  $("#r-pending").textContent = `${h.retrain.pending_uploads} uploaded image(s) waiting. ` +
+    (h.retrain.auto_retrain ? `Retraining starts automatically at ${h.retrain.threshold}.` : "Automatic retraining is off.");
+  const running = st.state === "running" || st.state === "queued";
+  $("#r-btn").disabled = running;
+  const res = st.result;
+  $("#r-state").innerHTML = running ? `<span class="dot busy"></span>Retraining… (${st.trigger})` :
+    st.state === "finished" ? `<span class="dot ok"></span>Last run produced v${res.version}: macro-F1 ${fmtPct(res.macro_f1)} vs ${fmtPct(res.baseline_macro_f1)} before, so it was <b>${res.promoted ? "promoted" : "not promoted"}</b> (${res.duration_s}s).` :
+    st.state === "failed" ? `<span class="dot down"></span>Last run failed: ${st.error}` : "No retraining has run since this deployment started.";
+  if (st.log?.length) { $("#r-log").hidden = false; $("#r-log").textContent = st.log.join("\n"); }
+  if (running) retrainTimer = setTimeout(pollRetrain, 3000);
+  else if (st.state === "finished") { insightsLoaded = false; }
+}
+
+chartDefaults();
+pollHealth(); setInterval(pollHealth, 5000);
+</script>
+</body>
+</html>
