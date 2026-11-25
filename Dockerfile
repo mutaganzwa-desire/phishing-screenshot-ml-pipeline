@@ -15,7 +15,7 @@ COPY models ./models
 COPY data ./data
 COPY reports ./reports
 
-# Run as a non-root user (uid 1000, which Hugging Face Spaces requires) that
+# Run as a non-root user (uid 1000) that
 # can write new uploads and model versions.
 RUN useradd -m -u 1000 appuser && chown -R appuser /app
 USER appuser

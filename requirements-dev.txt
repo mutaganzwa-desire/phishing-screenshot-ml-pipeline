@@ -5,3 +5,4 @@ matplotlib==3.11.2
 seaborn==0.13.2
 pandas==3.0.5
 locust==2.47.0
+ai-edge-litert==2.4.0   # to export and test the lightweight backend

@@ -1,0 +1,28 @@
+# Slim image for Render's free tier (512 MB RAM, 0.1 CPU).
+# Uses the lightweight TFLite backend (src/lite.py) instead of TensorFlow,
+# so the container idles at ~120 MB and peaks at ~320 MB during a retrain.
+# The full TensorFlow image for local scaling tests is ./Dockerfile.
+FROM python:3.13-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
+    BACKEND=lite PORT=10000
+WORKDIR /app
+
+COPY requirements-render.txt .
+RUN pip install --no-cache-dir -r requirements-render.txt
+
+COPY src ./src
+COPY data ./data
+COPY reports ./reports
+# Only what the lite backend needs: TFLite backbone, softmax head, cached
+# embeddings, class names and the version registry (not the .h5 Keras files).
+COPY models/feature_extractor.tflite models/head.npz models/embeddings.npz \
+     models/class_names.json models/registry.json ./models/
+
+RUN useradd -m -u 1000 appuser && chown -R appuser /app
+USER appuser
+
+EXPOSE 10000
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s \
+  CMD python -c "import urllib.request,os; urllib.request.urlopen(f'http://localhost:{os.environ[\"PORT\"]}/health')"
+CMD ["sh", "-c", "uvicorn src.api:app --host 0.0.0.0 --port ${PORT}"]
