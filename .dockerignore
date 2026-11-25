@@ -1,0 +1,10 @@
+.git
+.cache
+notebook
+locust
+**/__pycache__
+*.ipynb
+models/versions
+models/retrain.lock
+models/retrain_status.json
+data/uploads/*

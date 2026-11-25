@@ -1,0 +1,37 @@
+# Scalable local deployment: N API containers behind an nginx load balancer.
+#   docker compose up -d --build --scale api=4
+# UI + API: http://localhost:8080
+services:
+  api:
+    build: .
+    image: phish-iris-api:latest
+    environment:
+      - AUTO_RETRAIN=true
+      - RETRAIN_THRESHOLD=30
+    volumes:
+      # Shared by every replica: a model promoted by one container's retrain
+      # job is hot-reloaded by all the others.
+      - models:/app/models
+      - data:/app/data
+      - reports:/app/reports
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 2g
+    restart: unless-stopped
+
+  lb:
+    image: nginx:1.29-alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api
+    restart: unless-stopped
+
+volumes:
+  models:
+  data:
+  reports:

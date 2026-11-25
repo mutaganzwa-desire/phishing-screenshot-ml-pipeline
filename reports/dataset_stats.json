@@ -1,0 +1,186 @@
+{
+  "classes": {
+    "adobe": {
+      "train": 37,
+      "test": 19,
+      "mean_r": 189.7797,
+      "mean_g": 175.4443,
+      "mean_b": 175.6802,
+      "brightness": 180.3014,
+      "saturation": 27.8811,
+      "edge_density": 0.0869,
+      "whitespace_ratio": 0.4386
+    },
+    "alibaba": {
+      "train": 37,
+      "test": 18,
+      "mean_r": 226.5284,
+      "mean_g": 225.7844,
+      "mean_b": 227.2871,
+      "brightness": 226.5333,
+      "saturation": 24.5812,
+      "edge_density": 0.096,
+      "whitespace_ratio": 0.7282
+    },
+    "amazon": {
+      "train": 15,
+      "test": 9,
+      "mean_r": 211.6228,
+      "mean_g": 209.4787,
+      "mean_b": 206.2615,
+      "brightness": 209.121,
+      "saturation": 20.3015,
+      "edge_density": 0.1002,
+      "whitespace_ratio": 0.5975
+    },
+    "apple": {
+      "train": 32,
+      "test": 16,
+      "mean_r": 201.9125,
+      "mean_g": 199.3379,
+      "mean_b": 199.6157,
+      "brightness": 200.2887,
+      "saturation": 23.9252,
+      "edge_density": 0.0863,
+      "whitespace_ratio": 0.6643
+    },
+    "boa": {
+      "train": 54,
+      "test": 27,
+      "mean_r": 236.8124,
+      "mean_g": 227.027,
+      "mean_b": 228.223,
+      "brightness": 230.6874,
+      "saturation": 19.2222,
+      "edge_density": 0.1227,
+      "whitespace_ratio": 0.7301
+    },
+    "chase": {
+      "train": 56,
+      "test": 28,
+      "mean_r": 213.0453,
+      "mean_g": 215.5569,
+      "mean_b": 211.4166,
+      "brightness": 213.3396,
+      "saturation": 28.6027,
+      "edge_density": 0.1477,
+      "whitespace_ratio": 0.6473
+    },
+    "dhl": {
+      "train": 52,
+      "test": 26,
+      "mean_r": 227.4499,
+      "mean_g": 207.1611,
+      "mean_b": 147.1995,
+      "brightness": 193.9368,
+      "saturation": 91.5993,
+      "edge_density": 0.1185,
+      "whitespace_ratio": 0.4517
+    },
+    "dropbox": {
+      "train": 53,
+      "test": 27,
+      "mean_r": 235.2054,
+      "mean_g": 234.7478,
+      "mean_b": 237.1029,
+      "brightness": 235.6854,
+      "saturation": 11.9023,
+      "edge_density": 0.0892,
+      "whitespace_ratio": 0.8049
+    },
+    "facebook": {
+      "train": 74,
+      "test": 36,
+      "mean_r": 205.1347,
+      "mean_g": 211.1967,
+      "mean_b": 223.8819,
+      "brightness": 213.4044,
+      "saturation": 36.5031,
+      "edge_density": 0.0837,
+      "whitespace_ratio": 0.612
+    },
+    "linkedin": {
+      "train": 20,
+      "test": 10,
+      "mean_r": 127.24,
+      "mean_g": 135.1181,
+      "mean_b": 137.7075,
+      "brightness": 133.3552,
+      "saturation": 59.2155,
+      "edge_density": 0.1635,
+      "whitespace_ratio": 0.1314
+    },
+    "microsoft": {
+      "train": 61,
+      "test": 30,
+      "mean_r": 191.1107,
+      "mean_g": 183.9415,
+      "mean_b": 180.0527,
+      "brightness": 185.035,
+      "saturation": 51.8775,
+      "edge_density": 0.0955,
+      "whitespace_ratio": 0.4812
+    },
+    "other": {
+      "train": 914,
+      "test": 456,
+      "mean_r": 177.8,
+      "mean_g": 177.5049,
+      "mean_b": 177.3568,
+      "brightness": 177.5539,
+      "saturation": 48.1957,
+      "edge_density": 0.1737,
+      "whitespace_ratio": 0.4126
+    },
+    "paypal": {
+      "train": 117,
+      "test": 58,
+      "mean_r": 201.7446,
+      "mean_g": 202.9825,
+      "mean_b": 205.5346,
+      "brightness": 203.4205,
+      "saturation": 21.3405,
+      "edge_density": 0.0907,
+      "whitespace_ratio": 0.6621
+    },
+    "wellsfargo": {
+      "train": 59,
+      "test": 30,
+      "mean_r": 214.188,
+      "mean_g": 206.3536,
+      "mean_b": 204.5626,
+      "brightness": 208.3681,
+      "saturation": 25.2875,
+      "edge_density": 0.1299,
+      "whitespace_ratio": 0.6476
+    },
+    "yahoo": {
+      "train": 51,
+      "test": 26,
+      "mean_r": 225.6677,
+      "mean_g": 224.258,
+      "mean_b": 230.2974,
+      "brightness": 226.741,
+      "saturation": 19.3021,
+      "edge_density": 0.0863,
+      "whitespace_ratio": 0.7971
+    }
+  },
+  "label_names": {
+    "adobe": "Adobe",
+    "alibaba": "Alibaba",
+    "amazon": "Amazon",
+    "apple": "Apple",
+    "boa": "Bank of America",
+    "chase": "Chase",
+    "dhl": "DHL",
+    "dropbox": "Dropbox",
+    "facebook": "Facebook",
+    "linkedin": "LinkedIn",
+    "microsoft": "Microsoft",
+    "other": "Other / legitimate",
+    "paypal": "PayPal",
+    "wellsfargo": "Wells Fargo",
+    "yahoo": "Yahoo"
+  }
+}
