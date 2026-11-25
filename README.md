@@ -139,6 +139,7 @@ phishing-screenshot-ml-pipeline/
 │   ├── preprocessing.py   # acquisition, audit, cleaning, tf.data, image features
 │   ├── model.py           # model creation, training, evaluation, versioning, retraining
 │   ├── prediction.py      # Predictor (hot-reloading) used by the API
+│   ├── lite.py            # TFLite backend for 512 MB hosts (Render)
 │   ├── api.py             # FastAPI app
 │   └── static/index.html  # web UI
 ├── data/
@@ -147,14 +148,15 @@ phishing-screenshot-ml-pipeline/
 │   └── uploads/           # new labelled data waiting for retraining
 ├── models/
 │   ├── phish_iris_mobilenetv2.h5   # production model
+│   ├── feature_extractor.tflite, head.npz, embeddings.npz   # lightweight backend
 │   ├── class_names.json, registry.json
 │   └── versions/                   # every trained version
 ├── reports/               # metrics.json, data_audit.json, dataset_stats.json, figures/
 ├── locust/                # locustfile.py, run_scaling_test.sh, results/
-├── deploy/                # nginx.conf, Hugging Face Space header
+├── deploy/                # nginx.conf
 ├── docs/                  # demo script, UI screenshots
-├── Dockerfile, docker-compose.yml
-└── requirements.txt, requirements-dev.txt
+├── Dockerfile, docker-compose.yml, render.yaml
+└── requirements.txt, requirements-dev.txt, requirements-render.txt
 ```
 
 ---
@@ -164,8 +166,8 @@ phishing-screenshot-ml-pipeline/
 ### 1. Run locally with Python (3.11–3.13)
 
 ```bash
-git clone https://github.com/mutaganzwa-desire/<repo-name>.git
-cd <repo-name>
+git clone https://github.com/mutaganzwa-desire/phishing-screenshot-ml-pipeline.git
+cd phishing-screenshot-ml-pipeline
 python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements-dev.txt
 uvicorn src.api:app --port 8000
@@ -195,22 +197,33 @@ bash locust/run_scaling_test.sh 50 60s       # 50 users, 60 s, at 1, 2 and 4 con
 
 ## Deployment
 
-**Recommended: Hugging Face Spaces (Docker, free).** The free tier gives 2 vCPU and 16 GB RAM, which TensorFlow
-needs. Render's and Railway's free tiers (512 MB) are too small.
+**Live deployment: Render (free tier) with the lightweight backend.**
 
-1. Create a Space at <https://huggingface.co/new-space>, choose **Docker → Blank** and **CPU basic (free)**.
-2. Push this repository to the Space, using the header file in `deploy/huggingface/` as the Space's README:
-   ```bash
-   git clone https://huggingface.co/spaces/<hf-user>/<space-name> space
-   rsync -a --exclude .git --exclude README.md ./ space/
-   cp deploy/huggingface/README.md space/README.md
-   cd space && git lfs install && git lfs track "*.h5" "*.jpg" && git add -A && git commit -m "Deploy" && git push
-   ```
-3. The Space builds the Dockerfile and serves the app at `https://<hf-user>-<space-name>.hf.space`.
-   Put that URL in the table at the top of this README.
+Full TensorFlow needs more than 1 GB of RAM, but Render's free tier has 512 MB. So the deployed service uses
+`src/lite.py`: the trained model is split into a **TFLite MobileNetV2 feature extractor**
+(`models/feature_extractor.tflite`) and its **softmax head** (`models/head.npz`). Predictions are identical to
+the Keras model (test accuracy 0.789), take about 10 ms per image instead of 150 ms, and the whole service peaks
+at about 320 MB of RAM, including retraining.
 
-Other options: Google Cloud Run or Azure Container Apps work with the same image (`--memory 2Gi`). On those, mount
-a persistent volume at `/app/models` and `/app/data`, or retrained versions are lost when the instance restarts.
+On Render, **retraining re-fits the classification head** (multinomial logistic regression) on the embeddings of
+`data/train` plus the uploads. Embeddings of existing images are cached in `models/embeddings.npz`, so only new
+images need to be embedded. The same promotion rule and version registry apply. The Docker and Compose setup
+keeps the full TensorFlow backend, which fine-tunes the backbone too. `GET /health` reports which backend is running.
+
+Steps:
+1. Sign in at <https://dashboard.render.com> with GitHub.
+2. Click **New → Blueprint**, pick this repository and click **Apply**. Render reads `render.yaml`
+   (free web service, `pip install -r requirements-render.txt`, `uvicorn src.api:app`).
+3. When the deploy finishes, open `https://<service-name>.onrender.com` and put the URL in the table at the top.
+
+Free-tier limits: 0.1 CPU, the service sleeps after 15 minutes without traffic (the first request then takes
+about a minute), and the disk resets on every restart, so retrained versions are not kept. The load test in this
+README was run with Docker, not on Render.
+
+To regenerate the lightweight files after retraining the Keras model: `python -m src.lite export`.
+
+Other options: Google Cloud Run or Azure Container Apps can run the full Docker image (`--memory 2Gi`). On those,
+mount a persistent volume at `/app/models` and `/app/data`, or retrained versions are lost when the instance restarts.
 
 ---
 
