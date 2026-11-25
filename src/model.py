@@ -172,9 +172,18 @@ def evaluate(model, class_names: list[str], test_dir: Path = pp.TEST_DIR) -> dic
     Binary view ('phishing' = any brand, 'legitimate' = other): the security
     question the classifier answers in practice, with ROC-AUC on P(not other).
     """
+    y, probs, _ = predict_dir(model, test_dir, class_names)
+    return metrics_from_probs(y, probs, class_names)
+
+
+def metrics_from_probs(y: np.ndarray, probs: np.ndarray, class_names: list[str]) -> dict:
+    """Compute every evaluation metric from true labels and class probabilities.
+
+    Shared by the Keras pipeline and the lightweight (TFLite) deployment.
+    """
     from sklearn import metrics as m
 
-    y, probs, _ = predict_dir(model, test_dir, class_names)
+    y = np.asarray(y)
     pred = probs.argmax(1)
     labels_idx = list(range(len(class_names)))
     p, r, f, _ = m.precision_recall_fscore_support(y, pred, average="macro", zero_division=0)

@@ -12,13 +12,15 @@ from pathlib import Path
 
 import numpy as np
 
+from src import lite
 from src import preprocessing as pp
 from src.model import MODEL_PATH, MODELS_DIR, REGISTRY_PATH, load_model, load_registry
 
 
 class Predictor:
     def __init__(self, model_path: Path = MODEL_PATH):
-        self.model_path = model_path
+        self.backend = "lite" if lite.enabled() else "tf"
+        self.model_path = lite.HEAD_PATH if self.backend == "lite" else model_path
         self._lock = threading.Lock()
         self._mtime = None
         self.model = None
@@ -37,7 +39,7 @@ class Predictor:
         with self._lock:
             if stamp == self._mtime and self.model is not None:
                 return False
-            model = load_model(self.model_path)
+            model = lite.LiteModel() if self.backend == "lite" else load_model(self.model_path)
             self.class_names = json.loads((MODELS_DIR / "class_names.json").read_text())
             self.version = load_registry().get("current")
             self.model = model
