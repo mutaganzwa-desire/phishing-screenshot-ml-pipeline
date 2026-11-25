@@ -1,0 +1,16 @@
+# Render Blueprint: free web service running the lightweight (TFLite) backend.
+services:
+  - type: web
+    name: phish-iris-classifier
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-render.txt
+    startCommand: uvicorn src.api:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.5
+      - key: BACKEND
+        value: lite
+      - key: RETRAIN_THRESHOLD
+        value: "30"
