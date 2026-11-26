@@ -1,127 +1,152 @@
-# Visual Phishing Detection: an end-to-end ML pipeline
+# Visual Phishing Detection: an ML pipeline
 
-An image classification pipeline that looks at a **screenshot of a web page** and predicts which of 14
-heavily phished brands it imitates (PayPal, Microsoft, Facebook, DHL, …), or `other` when it copies
-none of them. It covers data acquisition, cleaning, training, evaluation, a REST API, a web UI with
-upload and retraining, Docker scaling behind a load balancer, and a Locust load test.
+A web app that looks at a **screenshot of a web page** and tells you which brand it is pretending to be
+(PayPal, Microsoft, Facebook, DHL and 10 others), or `other` if it copies none of them.
 
-It extends my Intro to ML summative,
-[phishing URL detection (ML vs DL)](https://github.com/mutaganzwa-desire/phishing-url-detection-ml-vs-deep-learning),
-from the URL string to what the page **looks like**.
+It continues my Intro to ML project,
+[phishing URL detection](https://github.com/mutaganzwa-desire/phishing-url-detection-ml-vs-deep-learning):
+that one read the web address, and this one reads what the page **looks like**.
 
 | | |
 |---|---|
-| **Video demo** | [YouTube link:](https://youtu.be/_0O0BO16lvg) |
-| **Live app** |  [_App URL:](https://phish-iris-classifier.onrender.com/) |
-| **Dataset** | [Phish-IRIS](https://data.mendeley.com/datasets/tk4fkswtj5) (2,849 screenshots, 15 classes, collected 2018) |
-| **Model** | MobileNetV2 transfer learning (Keras), `models/phish_iris_mobilenetv2.h5` |
+| **Live app** | https://phish-iris-classifier.onrender.com |
+| **Video demo** | https://youtu.be/_0O0BO16lvg |
 | **Notebook** | [`notebook/phishing_screenshot_pipeline.ipynb`](notebook/phishing_screenshot_pipeline.ipynb) |
+| **Model** | `models/phish_iris_mobilenetv2.h5` (MobileNetV2, fine-tuned) |
+| **Dataset** | [Phish-IRIS](https://data.mendeley.com/datasets/tk4fkswtj5): 2,849 screenshots, 15 classes |
 
 ---
 
-## Project description
+## How to use the live app
 
-Phishing kits clone the visual identity of the brand they target: the logo, the colours, the login form.
-Blocklists miss new phishing URLs, but a cloned page still *looks like* PayPal. This project trains a CNN
-to recognise that look. Its output has two uses:
+Open https://phish-iris-classifier.onrender.com. The free server sleeps when nobody is using it, so the first
+visit can take about a minute to load.
 
-* **Brand identification:** "this page is imitating Microsoft".
-* **Phishing score:** 1 − P(`other`), a binary phishing vs. legitimate signal.
+### 1. Overview
+Shows that the model is **online**, how long it has been running (**uptime**), which **model version** is live,
+and how fast recent predictions were.
 
-### Results (held-out test set, 816 screenshots)
+### 2. Predict
+1. Click **Predict**.
+2. Drop a screenshot of a web page into the box, or click it to choose a file (PNG or JPG).
+3. The app shows:
+   - the **verdict**, e.g. *"possible phishing page imitating PayPal"*, or *"legitimate / unknown brand"*;
+   - the model's **confidence** and its **top 3 guesses**;
+   - a **phishing score** from 0 to 1 (how likely the page is copying one of the brands).
 
-| metric | value |
+Want to try it? Use any image from `data/test/<brand>/` in this repo, e.g. `data/test/dhl/dhl_19_png.jpg`.
+
+![Predict tab](docs/images/ui_predict.png)
+
+### 3. Data insights
+Three charts that explain the dataset, each with a short explanation:
+- **Class balance:** how many screenshots each brand has.
+- **Colour:** fake pages copy the brand's colours (DHL is yellow, Facebook is blue).
+- **Layout:** fake pages are plain white login forms, while real websites are busy.
+
+It also shows one example screenshot per brand.
+
+### 4. Upload & retrain
+1. **Upload new data.** Either choose several images and pick their brand from the dropdown, or upload a
+   **.zip** with one folder per brand (e.g. `amazon/`, `linkedin/`). Folder names must match the brand names in the
+   dropdown.
+2. Each image is cleaned the same way as the training data (converted to RGB, resized to 224×224) and saved, waiting
+   for retraining. The page tells you how many images are waiting.
+3. Click **Retrain now**. Retraining also starts **automatically** once 30 new images are waiting.
+4. The model is updated **starting from the current trained model**, then tested on the same test images.
+   It only replaces the live model if it scores **at least as well**. The log shows the result
+   (about 3–4 minutes on the free server).
+
+### 5. Model performance
+Shows the live model's test scores (accuracy, F1 and more), its training curves, the score for each brand, a
+confusion matrix, and a **Model versions** table listing every retrain and whether it was promoted.
+
+> The free server resets its storage when it restarts, so uploaded images and new model versions are cleared,
+> and the app goes back to the original model.
+
+---
+
+## Results
+
+Tested on 816 screenshots the model never saw during training:
+
+| Metric | Score |
 |---|---|
-| accuracy | **78.8%** |
-| top-3 accuracy | **92.7%** |
-| macro F1 / balanced accuracy | 0.649 / 0.613 |
-| Cohen's kappa | 0.671 |
-| phishing vs. other: precision / recall / F1 | 0.893 / 0.789 / 0.838 |
-| phishing vs. other: ROC-AUC / average precision | **0.948** / 0.927 |
+| Accuracy | **78.8%** |
+| Right brand in top 3 guesses | **92.7%** |
+| Precision / Recall / F1 (average over brands) | 0.728 / 0.613 / 0.649 |
+| Loss (log loss) | 0.774 |
+| Fake vs. real page: F1 / ROC-AUC | 0.838 / **0.948** |
 
-The notebook compares the deployed fine-tuned model with a frozen-backbone baseline (macro F1 0.579) and
-reports per-class scores, the confusion matrix, ROC and PR curves, and the model's most confident mistakes.
-
-**Data audit.** The original archive contains **400 exact duplicate files**, and **204 of its official test
-images are copies of training images**. I removed the duplicates and grouped near-identical screenshots with
-a perceptual hash. The data was then re-split (stratified, 67/33) so that no near-copy of a test image is
-used for training. Scores are therefore lower than numbers reported on the leaky split, but they are honest.
-
-### Feature visualizations (in the notebook and the UI)
-
-1. **Class balance:** `other` is 56% of the data, and PayPal and Facebook are the most phished brands. This is
-   why training uses class weights and the model is judged on macro F1.
-2. **Colour:** phishing kits copy brand palettes. DHL pages are strongly yellow, Facebook and LinkedIn lean blue,
-   and Adobe and Microsoft lean red. But many brands share "white page, blue button", so a CNN is needed to read
-   logos and layout.
-3. **Layout:** legitimate pages have about 1.6× the edge density (clutter) of phishing pages, while phishing
-   pages are mostly white login forms. *A sparse white page with a famous logo* is the visual signature of a kit.
-
-<p>
-<img src="reports/figures/colour.png" width="49%"> <img src="reports/figures/layout.png" width="49%">
-</p>
+**How the model was built** (details in the notebook):
+- **Pre-trained MobileNetV2**, trained in two rounds: first the final layer, then fine-tuning of the top layers.
+- Adam optimizer, early stopping, learning-rate reduction, dropout, L2 regularization, class weights and
+  light image augmentation.
+- **Data cleaning:** the original dataset had 400 duplicate images, and 204 of its test images were copies of
+  training images. I removed them and split the data so near-identical screenshots never appear in both
+  training and test. The scores above are therefore honest ones.
 
 ---
 
-## Flood request simulation (Locust)
+## Load test (Locust)
 
-50 concurrent users, each sending a screenshot to `/predict` every 0.5–1.5 s for 60 s. The API ran
-in **1, 2 and 4 Docker containers** (1 CPU each) behind an nginx load balancer
-(`locust/run_scaling_test.sh`).
+50 users sending screenshots to the app at the same time for 60 seconds, with 1, 2 and 4 Docker containers
+behind a load balancer:
 
-| containers | requests | failures | avg (ms) | median (ms) | p95 (ms) | p99 (ms) | max (ms) | req/s |
-|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 1 | 358 | 0 | 6,076 | 6,600 | 7,700 | 12,000 | 14,662 | 6.1 |
-| 2 | 673 | 0 | 2,843 | 2,900 | 3,900 | 4,400 | 5,133 | 11.4 |
-| 4 | 1,503 | 0 | 749 | 750 | 1,200 | 1,400 | 1,630 | 25.4 |
+| Containers | Requests | Failures | Average wait | Median wait | 95% of requests under | Requests per second |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 358 | 0 | 6.1 s | 6.6 s | 7.7 s | 6.1 |
+| 2 | 673 | 0 | 2.8 s | 2.9 s | 3.9 s | 11.4 |
+| 4 | 1,503 | 0 | 0.75 s | 0.75 s | 1.2 s | 25.4 |
 
-![Locust scaling results](locust/results/scaling.png)
+![Locust results](locust/results/scaling.png)
 
-**Interpretation.** One container handles about 6 predictions/s (about 150 ms of CPU each). At 50 users,
-requests queue up and the median wait reaches 6.6 s. Doubling the containers roughly doubles throughput and
-halves latency. With 4 containers the service keeps up with the load: median 0.75 s and **4.2× the
-throughput**, with no failed requests at any size. Raw CSVs are in `locust/results/`.
+More containers means shorter waits: going from 1 to 4 containers cut the median wait from 6.6 s to 0.75 s
+and handled 4 times as many requests, with no failures. Raw results are in `locust/results/`.
 
 ---
 
-## Features
+## Setup
 
-| Requirement | Where |
-|---|---|
-| Predict one image | UI **Predict** tab · `POST /predict` |
-| Model up-time | UI **Overview** tab · `GET /health` (uptime, version, request count, p50/p95 latency, container id) |
-| Visualizations (3 features + interpretation) | UI **Data insights** tab · notebook section 4 |
-| Bulk upload | UI **Upload & retrain** · `POST /upload` (many images + a label, or a `.zip` with one folder per class) |
-| Trigger retraining | **Retrain now** button · `POST /retrain` · automatic once `RETRAIN_THRESHOLD` (30) uploads are waiting |
-| Evaluation in production | UI **Model performance** tab · `GET /metrics` (metrics + version history) |
-
-**How retraining works** (`src/model.py: retrain`)
-1. Uploads are cleaned with the same preprocessing and saved to `data/uploads/<class>/`.
-2. The production model is fine-tuned on `data/train` plus the uploads (warm start: under a minute on a 4-core machine, about 5 minutes in a 1-CPU container).
-3. The candidate is evaluated on the fixed test set and **promoted only if macro F1 drops by no more than 0.01**.
-   Every version is saved in `models/versions/` and logged in `models/registry.json`.
-4. The uploads join `data/train`. Every API container sees the new `registry.json` on the shared volume and
-   hot-reloads the model.
-
-### API
-
-| Method | Path | Description |
-|---|---|---|
-| GET | `/` | Web UI |
-| GET | `/health` | Status, uptime, model version, latency stats |
-| POST | `/predict` | form field `file`: one screenshot. Returns brand, confidence, top-3 and phishing score |
-| POST | `/upload` | form fields `files` (images or `.zip`), optional `label` |
-| POST | `/retrain` | start retraining (409 if one is running) |
-| GET | `/retrain/status` | state and log of the current or last retrain |
-| GET | `/metrics` | test metrics of the production model + version registry |
-| GET | `/insights` | dataset feature statistics |
-| GET | `/docs` | interactive OpenAPI docs |
-
+### Run locally (Python 3.11–3.13)
 ```bash
-curl -F "file=@screenshot.png" http://localhost:8080/predict
-curl -F "files=@new_images.zip" http://localhost:8080/upload
-curl -X POST http://localhost:8080/retrain
+git clone https://github.com/mutaganzwa-desire/phishing-screenshot-ml-pipeline.git
+cd phishing-screenshot-ml-pipeline
+python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
+pip install -r requirements-dev.txt
+uvicorn src.api:app --port 8000                        # open http://localhost:8000
 ```
+The cleaned data and trained model are already in the repo. To rebuild from scratch, run the notebook top to bottom.
+
+### Run with Docker
+```bash
+docker compose up -d --build              # app + load balancer at http://localhost:8080
+docker compose up -d --scale api=4        # run 4 copies of the app
+bash locust/run_scaling_test.sh 50 60s    # repeat the load test (needs requirements-dev.txt)
+```
+
+### Deploy on Render (free)
+The live app runs on Render as a Docker container built from `Dockerfile.render`. This is a lighter version of the
+same model (TFLite), so it fits in the free tier's 512 MB of memory. It gives the same predictions, and retraining
+on Render re-learns the model's final layer.
+1. Sign in at https://dashboard.render.com with GitHub.
+2. Click **New → Blueprint**, choose this repo, and click **Deploy Blueprint** (Render reads `render.yaml`).
+
+---
+
+## API (for developers)
+
+Interactive docs: https://phish-iris-classifier.onrender.com/docs
+
+| Method | Path | What it does |
+|---|---|---|
+| POST | `/predict` | classify one screenshot (`file`) |
+| POST | `/upload` | upload images (`files`, optional `label`) or a `.zip` of brand folders |
+| POST | `/retrain` | start retraining |
+| GET | `/retrain/status` | progress and result of the last retrain |
+| GET | `/health` | status, uptime, model version |
+| GET | `/metrics` | test scores and model versions |
+| GET | `/insights` | data for the charts |
 
 ---
 
@@ -130,117 +155,29 @@ curl -X POST http://localhost:8080/retrain
 ```
 phishing-screenshot-ml-pipeline/
 ├── README.md
-├── notebook/
-│   ├── phishing_screenshot_pipeline.ipynb   # preprocessing, training, evaluation, retraining
-│   └── build_notebook.py                    # regenerates the notebook
+├── notebook/phishing_screenshot_pipeline.ipynb   # preprocessing, training, evaluation, retraining
 ├── src/
-│   ├── preprocessing.py   # acquisition, audit, cleaning, tf.data, image features
-│   ├── model.py           # model creation, training, evaluation, versioning, retraining
-│   ├── prediction.py      # Predictor (hot-reloading) used by the API
-│   ├── lite.py            # TFLite backend for 512 MB hosts (Render)
-│   ├── api.py             # FastAPI app
-│   └── static/index.html  # web UI
-├── data/
-│   ├── train/<class>/     # 1,632 preprocessed 224×224 screenshots
-│   ├── test/<class>/      # 816
-│   └── uploads/           # new labelled data waiting for retraining
-├── models/
-│   ├── phish_iris_mobilenetv2.h5   # production model
-│   ├── feature_extractor.tflite, head.npz, embeddings.npz   # lightweight backend
-│   ├── class_names.json, registry.json
-│   └── versions/                   # every trained version
-├── reports/               # metrics.json, data_audit.json, dataset_stats.json, figures/
-├── locust/                # locustfile.py, run_scaling_test.sh, results/
-├── deploy/                # nginx.conf
-├── docs/                  # demo script, UI screenshots
-├── Dockerfile (full TensorFlow), Dockerfile.render (slim, Render), docker-compose.yml, render.yaml
+│   ├── preprocessing.py    # getting, cleaning and preparing images
+│   ├── model.py            # building, training, testing and retraining the model
+│   ├── prediction.py       # making predictions
+│   ├── lite.py             # lighter model version used on Render
+│   ├── api.py              # the web app and API
+│   └── static/index.html   # the user interface
+├── data/train/, data/test/ # 1,632 / 816 cleaned screenshots, one folder per brand
+├── models/                 # trained model (.h5), lighter version (.tflite) and version history
+├── reports/                # metrics, data audit, charts
+├── locust/                 # load test script and results
+├── Dockerfile, Dockerfile.render, docker-compose.yml, render.yaml
 └── requirements.txt, requirements-dev.txt, requirements-render.txt
 ```
 
 ---
 
-## Setup
+## Limitations
 
-### 1. Run locally with Python (3.11–3.13)
-
-```bash
-git clone https://github.com/mutaganzwa-desire/phishing-screenshot-ml-pipeline.git
-cd phishing-screenshot-ml-pipeline
-python -m venv .venv && source .venv/bin/activate      # Windows: .venv\Scripts\activate
-pip install -r requirements-dev.txt
-uvicorn src.api:app --port 8000
-# open http://localhost:8000
-```
-
-The processed data and the trained model are in the repo, so no download is needed. To rebuild everything
-from the raw archive: `python -m src.preprocessing` (downloads about 800 MB), then
-`python -m src.model train`, or run the notebook top to bottom.
-
-### 2. Run with Docker (one or many containers)
-
-```bash
-docker compose up -d --build                 # 1 API container + nginx, http://localhost:8080
-docker compose up -d --scale api=4           # scale to 4 containers
-```
-
-### 3. Reproduce the load test
-
-```bash
-pip install -r requirements-dev.txt
-bash locust/run_scaling_test.sh 50 60s       # 50 users, 60 s, at 1, 2 and 4 containers
-# or interactively: locust -f locust/locustfile.py --host http://localhost:8080  ->  http://localhost:8089
-```
-
----
-
-## Deployment
-
-**Live deployment: Render (free tier), as a Docker container with the lightweight backend.**
-
-Full TensorFlow needs more than 1 GB of RAM, but Render's free tier has 512 MB. So the deployed service uses
-`src/lite.py`: the trained model is split into a **TFLite MobileNetV2 feature extractor**
-(`models/feature_extractor.tflite`) and its **softmax head** (`models/head.npz`). Predictions are identical to
-the Keras model (test accuracy 0.789), take about 10 ms per image instead of 150 ms, and the whole service peaks
-at about 320 MB of RAM, including retraining.
-
-On Render, **retraining re-fits the classification head** (multinomial logistic regression) on the embeddings of
-`data/train` plus the uploads. Embeddings of existing images are cached in `models/embeddings.npz`, so only new
-images need to be embedded. The same promotion rule and version registry apply. The Docker and Compose setup
-keeps the full TensorFlow backend, which fine-tunes the backbone too. `GET /health` reports which backend is running.
-
-Steps:
-Render builds `Dockerfile.render`, a slim image (about 260 MB) with `requirements-render.txt` and no TensorFlow.
-Tested locally with Render's free limits (`docker run --memory 512m --cpus 0.1`), it idles at about 90 MB and
-peaks at about 240 MB during a retrain, which takes about 3 minutes at 0.1 CPU.
-
-```bash
-docker build -f Dockerfile.render -t phish-iris-render .
-docker run -p 10000:10000 --memory 512m --cpus 0.1 phish-iris-render   # http://localhost:10000
-```
-
-1. Sign in at <https://dashboard.render.com> with GitHub.
-2. Click **New → Blueprint**, pick this repository and click **Apply**. Render reads `render.yaml`
-   (free web service, Docker runtime, `Dockerfile.render`).
-3. When the deploy finishes, open `https://<service-name>.onrender.com` and put the URL in the table at the top.
-
-Free-tier limits: 0.1 CPU, the service sleeps after 15 minutes without traffic (the first request then takes
-about a minute), and the disk resets on every restart, so retrained versions are not kept. The load test in this
-README was run with Docker, not on Render.
-
-To regenerate the lightweight files after retraining the Keras model: `python -m src.lite export`.
-
-Other options: Google Cloud Run or Azure Container Apps can run the full Docker image (`--memory 2Gi`). On those,
-mount a persistent volume at `/app/models` and `/app/data`, or retrained versions are lost when the instance restarts.
-
----
-
-## Limitations and next steps
-
-* Phish-IRIS dates from 2018. Brand designs and phishing kits change, so the model should be re-evaluated on
-  newly collected screenshots, as recommended in my URL project.
-* Part of the signal is "sparse login page vs. busy content page", so a real login page of an unlisted brand
-  can get a high phishing score. Combining this model with the URL model would address that.
-* The weakest classes (LinkedIn, Microsoft, Apple) have the fewest or most varied examples. The upload and
-  retrain loop is designed to fix exactly that.
+- The dataset is from 2018, so newer phishing pages may look different.
+- A real login page of a brand the model doesn't know can still get a high phishing score.
+- LinkedIn, Microsoft and Apple are the weakest brands because they have the fewest examples. Uploading more
+  of them and retraining is the way to improve them.
 
 **Author:** Mutaganzwa Gift Desire · African Leadership University, BSE · November 2026
