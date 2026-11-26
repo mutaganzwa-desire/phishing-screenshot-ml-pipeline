@@ -11,13 +11,11 @@ from the URL string to what the page **looks like**.
 
 | | |
 |---|---|
-| **Video demo** | _YouTube link: |
-| **Live app** |  [_Deployed URL:](https://phish-iris-classifier.onrender.com/) |
+| **Video demo** | [YouTube link:](https://youtu.be/_0O0BO16lvg) |
+| **Live app** |  [_App URL:](https://phish-iris-classifier.onrender.com/) |
 | **Dataset** | [Phish-IRIS](https://data.mendeley.com/datasets/tk4fkswtj5) (2,849 screenshots, 15 classes, collected 2018) |
 | **Model** | MobileNetV2 transfer learning (Keras), `models/phish_iris_mobilenetv2.h5` |
 | **Notebook** | [`notebook/phishing_screenshot_pipeline.ipynb`](notebook/phishing_screenshot_pipeline.ipynb) |
-
-![UI: prediction](docs/images/ui_predict.png)
 
 ---
 
